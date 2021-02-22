@@ -20,7 +20,7 @@ import org.gradle.integtests.fixtures.CrossVersionIntegrationSpec
 import org.gradle.integtests.fixtures.TargetVersions
 import org.gradle.util.GradleVersion
 
-import static org.gradle.integtests.fixtures.AbstractIntegrationSpec.jcenterRepository
+import static org.gradle.integtests.fixtures.AbstractIntegrationSpec.mavenCentralRepository
 
 @TargetVersions("5.2.1+")
 class GradleMetadataJavaLibraryCrossVersionIntegrationTest extends CrossVersionIntegrationSpec {
@@ -31,20 +31,22 @@ class GradleMetadataJavaLibraryCrossVersionIntegrationTest extends CrossVersionI
     def setup() {
         settingsFile << """
             rootProject.name = 'test'
-            enableFeaturePreview('GRADLE_METADATA')
+            if (org.gradle.util.GradleVersion.current().nextMajor == '6.0') {
+                enableFeaturePreview('GRADLE_METADATA')
+            }
             include 'consumer'
             include 'producer'
         """
         buildFile << """
             allprojects {
                apply plugin: 'java-library'
-    
+
                 group = 'com.acme'
                 version = '1.0'
-    
+
                 repositories {
                     maven { url "\${rootProject.buildDir}/repo" }
-                    ${jcenterRepository()}
+                    ${mavenCentralRepository()}
                 }
             }
         """
@@ -78,20 +80,20 @@ class GradleMetadataJavaLibraryCrossVersionIntegrationTest extends CrossVersionI
                 repositories {
                     maven { url "\${rootProject.buildDir}/repo" }
                 }
-                
+
                 publications {
                     producerLib(MavenPublication) {
                         from components.java
                     }
-                }           
-            } 
+                }
+            }
         """
 
         file('consumer/build.gradle') << """
             dependencies {
                 api 'com.acme:producer:1.0'
             }
-            
+
             task resolve {
                 doLast {
                     println configurations.runtimeClasspath.files

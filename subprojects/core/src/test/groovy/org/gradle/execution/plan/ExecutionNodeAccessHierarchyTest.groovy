@@ -16,6 +16,7 @@
 
 package org.gradle.execution.plan
 
+import com.google.common.collect.ImmutableSet
 import org.gradle.api.file.FileTreeElement
 import org.gradle.api.specs.Spec
 import org.gradle.api.tasks.util.PatternSet
@@ -101,18 +102,20 @@ class ExecutionNodeAccessHierarchyTest extends Specification {
         def node4 = Mock(Node)
         def node5 = Mock(Node)
         def node6 = Mock(Node)
+        def node7 = Mock(Node)
 
         hierarchy.recordNodeAccessingLocations(rootNode, [root.absolutePath])
         hierarchy.recordNodeAccessingLocations(node1, [root.file("location").absolutePath])
         hierarchy.recordNodeAccessingLocations(node2, [root.file("sub/location").absolutePath])
         hierarchy.recordNodeAccessingLocations(node3, [root.file("third/within").absolutePath])
-        hierarchy.recordNodeAccessingLocations(node4, [root.file("included/within").absolutePath])
+        hierarchy.recordNodeAccessingLocations(node4, [root.file("included/without").absolutePath])
+        hierarchy.recordNodeAccessingLocations(node7, [root.file("included/within").absolutePath])
         hierarchy.recordNodeAccessingLocations(node5, [root.file("excluded/within").absolutePath])
         hierarchy.recordNodeAccessingLocations(node6, [temporaryFolder.createDir("other").file("third").absolutePath])
 
         expect:
         nodesRelatedTo(root, "*/within") == ([rootNode, node1, node3, node4, node5] as Set)
-        nodesRelatedTo(root, "included/*") == ([rootNode, node4] as Set)
+        nodesRelatedTo(root, "included/*") == ([rootNode, node4, node7] as Set)
         nodesRelatedTo(root, "included/within") == ([rootNode, node4] as Set)
     }
 
@@ -170,6 +173,31 @@ class ExecutionNodeAccessHierarchyTest extends Specification {
         assertNodesAccessing("/other", root)
     }
 
+    def "can return nodes accessing some path taking includes and excludes into consideration"() {
+        def childNode = Mock(Node)
+
+        hierarchy.recordNodeAccessingLocations(childNode, ["/some/root/child/relative/path"])
+        expect:
+        hierarchy.getNodesAccessing("/some/root", excludes("child")).empty
+        hierarchy.getNodesAccessing("/some/root", includes("child")).empty
+        hierarchy.getNodesAccessing("/some/root", includes("child/**")) == ImmutableSet.of(childNode)
+    }
+
+    def "can record file trees with excludes for parts of paths"() {
+        def excluding = Mock(Node)
+        def including = Mock(Node)
+        def includingWithChildren = Mock(Node)
+        def root = "/some/root/"
+
+        hierarchy.recordNodeAccessingFileTree(excluding, root, excludes("child"))
+        hierarchy.recordNodeAccessingFileTree(including, root, includes("child"))
+        hierarchy.recordNodeAccessingFileTree(includingWithChildren, root, includes("child/**"))
+        expect:
+        assertNodesAccessing(root, excluding, including, includingWithChildren)
+        assertNodesAccessing("${root}/child", including, includingWithChildren)
+        assertNodesAccessing("${root}/child/some/subdir", includingWithChildren)
+    }
+
     def nodesRelatedTo(TestFile location, String includePattern) {
         return hierarchy.getNodesAccessing(location.absolutePath, includes(includePattern))
     }
@@ -180,6 +208,10 @@ class ExecutionNodeAccessHierarchyTest extends Specification {
 
     static Spec<FileTreeElement> includes(String include) {
         return new PatternSet().include(include).asSpec
+    }
+
+    static Spec<FileTreeElement> excludes(String exclude) {
+        return new PatternSet().exclude(exclude).asSpec
     }
 
     void assertNodesAccessing(String location, Node... expectedNodeList) {

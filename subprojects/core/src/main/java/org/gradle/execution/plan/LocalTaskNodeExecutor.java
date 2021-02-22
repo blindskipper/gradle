@@ -29,25 +29,28 @@ import org.gradle.api.internal.tasks.TaskStateInternal;
 import org.gradle.api.internal.tasks.execution.DefaultTaskExecutionContext;
 import org.gradle.api.specs.Spec;
 import org.gradle.api.tasks.util.PatternSet;
-import org.gradle.internal.reflect.TypeValidationContext;
+import org.gradle.internal.reflect.validation.Severity;
+import org.gradle.internal.reflect.validation.TypeValidationContext;
 import org.gradle.util.TextUtil;
 
 import java.io.File;
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 
 public class LocalTaskNodeExecutor implements NodeExecutor {
 
-    private final ExecutionNodeAccessHierarchy outputHierarchy;
     private final ExecutionNodeAccessHierarchy inputHierarchy;
+    private final ExecutionNodeAccessHierarchy outputHierarchy;
 
-    public LocalTaskNodeExecutor(ExecutionNodeAccessHierarchy outputHierarchy, ExecutionNodeAccessHierarchy inputHierarchy) {
-        this.outputHierarchy = outputHierarchy;
+    public LocalTaskNodeExecutor(ExecutionNodeAccessHierarchy inputHierarchy, ExecutionNodeAccessHierarchy outputHierarchy) {
         this.inputHierarchy = inputHierarchy;
+        this.outputHierarchy = outputHierarchy;
     }
 
     @Override
@@ -80,7 +83,13 @@ public class LocalTaskNodeExecutor implements NodeExecutor {
         for (String outputPath : node.getMutationInfo().outputPaths) {
             inputHierarchy.getNodesAccessing(outputPath).stream()
                 .filter(consumerNode -> hasNoSpecifiedOrder(node, consumerNode))
-                .forEach(consumerWithoutDependency -> collectValidationProblem(node, consumerWithoutDependency, validationContext));
+                .filter(LocalTaskNodeExecutor::isEnabled)
+                .forEach(consumerWithoutDependency -> collectValidationProblem(
+                    node,
+                    consumerWithoutDependency,
+                    validationContext,
+                    outputPath)
+                );
         }
         Set<String> taskInputs = new LinkedHashSet<>();
         Set<FilteredTree> filteredFileTreeTaskInputs = new LinkedHashSet<>();
@@ -118,7 +127,7 @@ public class LocalTaskNodeExecutor implements NodeExecutor {
                         throw e;
                     } else {
                         validationContext.visitPropertyProblem(
-                            TypeValidationContext.Severity.WARNING,
+                            Severity.WARNING,
                             spec.getPropertyName(),
                             String.format("cannot be resolved:%n%s%nConsider using Task.dependsOn instead of an input file collection", TextUtil.indent(e.getMessage(), "  "))
                         );
@@ -127,17 +136,38 @@ public class LocalTaskNodeExecutor implements NodeExecutor {
             });
         inputHierarchy.recordNodeAccessingLocations(node, taskInputs);
         for (String locationConsumedByThisTask : taskInputs) {
-            outputHierarchy.getNodesAccessing(locationConsumedByThisTask).stream()
-                .filter(producerNode -> hasNoSpecifiedOrder(producerNode, node))
-                .forEach(producerWithoutDependency -> collectValidationProblem(producerWithoutDependency, node, validationContext));
+            collectValidationProblemsForConsumer(node, validationContext, locationConsumedByThisTask, outputHierarchy.getNodesAccessing(locationConsumedByThisTask));
         }
         for (FilteredTree filteredFileTreeInput : filteredFileTreeTaskInputs) {
             Spec<FileTreeElement> spec = filteredFileTreeInput.getPatterns().getAsSpec();
             inputHierarchy.recordNodeAccessingFileTree(node, filteredFileTreeInput.getRoot(), spec);
-            outputHierarchy.getNodesAccessing(filteredFileTreeInput.getRoot(), spec).stream()
-                .filter(producerNode -> hasNoSpecifiedOrder(producerNode, node))
-                .forEach(producerWithoutDependency -> collectValidationProblem(producerWithoutDependency, node, validationContext));
+            collectValidationProblemsForConsumer(
+                node,
+                validationContext,
+                filteredFileTreeInput.getRoot(),
+                outputHierarchy.getNodesAccessing(filteredFileTreeInput.getRoot(), spec)
+            );
         }
+    }
+
+    private void collectValidationProblemsForConsumer(LocalTaskNode consumer, TypeValidationContext validationContext, String locationConsumedByThisTask, Collection<Node> producers) {
+        producers.stream()
+            .filter(producerNode -> hasNoSpecifiedOrder(producerNode, consumer))
+            .filter(LocalTaskNodeExecutor::isEnabled)
+            .forEach(producerWithoutDependency -> collectValidationProblem(
+                producerWithoutDependency,
+                consumer,
+                validationContext,
+                locationConsumedByThisTask
+            ));
+    }
+
+    private static boolean isEnabled(Node node) {
+        if (node instanceof LocalTaskNode) {
+            TaskInternal task = ((LocalTaskNode) node).getTask();
+            return task.getOnlyIf().isSatisfiedBy(task);
+        }
+        return false;
     }
 
     // In a perfect world, the consumer should depend on the producer.
@@ -161,30 +191,43 @@ public class LocalTaskNodeExecutor implements NodeExecutor {
         // Do a breadth first search for any dependency
         Deque<Node> queue = new ArrayDeque<>();
         Set<Node> seenNodes = new HashSet<>();
-        consumer.getHardSuccessors().forEach(successor -> {
-            if (seenNodes.add(successor)) {
-                queue.add(successor);
-            }
-        });
+        addHardSuccessorTasksToQueue(consumer, seenNodes, queue);
         while (!queue.isEmpty()) {
             Node dependency = queue.removeFirst();
             if (dependency == producer) {
                 return false;
             }
-            dependency.getHardSuccessors().forEach(node -> {
-                if (seenNodes.add(node)) {
-                    queue.add(node);
-                }
-            });
+            addHardSuccessorTasksToQueue(dependency, seenNodes, queue);
         }
         return true;
     }
 
-    private void collectValidationProblem(Node producer, Node consumer, TypeValidationContext validationContext) {
-        TypeValidationContext.Severity severity = TypeValidationContext.Severity.WARNING;
+    private static void addHardSuccessorTasksToQueue(Node node, Set<Node> seenNodes, Queue<Node> queue) {
+        node.getHardSuccessors().forEach(successor -> {
+            // We are searching for dependencies between tasks, so we can skip everything which is not a task when searching.
+            // For example we can skip all the transform nodes between two task nodes.
+            if (successor instanceof LocalTaskNode) {
+                if (seenNodes.add(successor)) {
+                    queue.add(successor);
+                }
+            } else {
+                addHardSuccessorTasksToQueue(successor, seenNodes, queue);
+            }
+        });
+    }
+
+    private void collectValidationProblem(Node producer, Node consumer, TypeValidationContext validationContext, String consumerProducerPath) {
+        Severity severity = Severity.WARNING;
         validationContext.visitPropertyProblem(
             severity,
-            String.format("Task '%s' uses the output of task '%s', without declaring an explicit dependency (using Task.dependsOn() or Task.mustRunAfter()) or an implicit dependency (declaring task '%s' as an input). This can lead to incorrect results being produced, depending on what order the tasks are executed", consumer, producer, producer)
+            String.format("Gradle detected a problem with the following location: '%s'. "
+                    + "Task '%s' uses this output of task '%s' without declaring an explicit dependency (using Task.dependsOn() or Task.mustRunAfter()) or an implicit dependency (declaring task '%s' as an input). "
+                    + "This can lead to incorrect results being produced, depending on what order the tasks are executed",
+                consumerProducerPath,
+                consumer,
+                producer,
+                producer
+            )
         );
     }
 

@@ -46,7 +46,7 @@ public class ClasspathBuilder {
     }
 
     /**
-     * Creates a Jar file using the given action to add entries to the file.
+     * Creates a Jar file using the given action to add entries to the file. If the file already exists it will be replaced.
      */
     public void jar(File jarFile, Action action) {
         try {

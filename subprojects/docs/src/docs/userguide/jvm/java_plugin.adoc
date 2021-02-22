@@ -351,7 +351,7 @@ Runtime classpath for running tests. Used by task `test`.
 `archives`::
 Artifacts (e.g. jars) produced by this project. Used by Gradle to determine "default" tasks to execute when building.
 
-`default` extends `runtimeClasspath`::
+`default` extends `runtimeElements`::
 The default configuration used by a project dependency on this project. Contains the artifacts and dependencies required by this project at runtime.
 
 The following diagrams show the dependency configurations for the _main_ and _test_ source sets respectively. You can use this legend to interpret the colors:
@@ -792,5 +792,5 @@ include::sample[dir="snippets/java/apt/kotlin", files="build.gradle.kts[tags=ann
 
 == Variant aware selection
 
-The whole set of JVM plugins leverage <<variant_model.adoc#,variant aware resolution>> for the dependencies used.
+The whole set of JVM plugins leverage <<variant_model.adoc#understanding-variant-selection,variant aware resolution>> for the dependencies used.
 They also install a set of attributes compatibility and disambiguation rules to <<variant_attributes.adoc#sub:jvm_default_attributes,configure the Gradle attributes>> for the specifics of the JVM ecosystem.

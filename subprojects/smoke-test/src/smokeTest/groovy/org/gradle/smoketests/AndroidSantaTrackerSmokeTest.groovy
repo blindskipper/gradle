@@ -32,55 +32,51 @@ class AndroidSantaTrackerSmokeTest extends AbstractAndroidSantaTrackerSmokeTest 
         return 150
     }
 
-    @UnsupportedWithConfigurationCache(iterationMatchers = AGP_4_0_ITERATION_MATCHER)
-    def "check deprecation warnings produced by building Santa Tracker Java (agp=#agpVersion)"() {
+    @UnsupportedWithConfigurationCache(iterationMatchers = [AGP_4_0_ITERATION_MATCHER, AGP_4_1_ITERATION_MATCHER])
+    def "check deprecation warnings produced by building Santa Tracker (agp=#agpVersion)"() {
 
         given:
         AGP_VERSIONS.assumeCurrentJavaVersionIsSupportedBy(agpVersion)
 
         and:
         def checkoutDir = temporaryFolder.createDir("checkout")
-        setupCopyOfSantaTracker(checkoutDir, 'Java', agpVersion)
+        setupCopyOfSantaTracker(checkoutDir)
 
         when:
         def result = buildLocation(checkoutDir, agpVersion)
 
         then:
-        if (agpVersion.startsWith('4.0.2')) {
-            expectDeprecationWarnings(
-                    result,
-                    "The WorkerExecutor.submit() method has been deprecated. " +
-                            "This is scheduled to be removed in Gradle 8.0. Please use the noIsolation(), classLoaderIsolation() or processIsolation() method instead. " +
-                            "See https://docs.gradle.org/${GradleVersion.current().version}/userguide/upgrading_version_5.html#method_workerexecutor_submit_is_deprecated for more details."
-            )
-        } else if (agpVersion.startsWith('4.1')) {
-            expectDeprecationWarnings(result, "The WorkerExecutor.submit() method has been deprecated. " +
-                    "This is scheduled to be removed in Gradle 8.0. Please use the noIsolation(), classLoaderIsolation() or processIsolation() method instead. " +
-                    "See https://docs.gradle.org/${GradleVersion.current().version}/userguide/upgrading_version_5.html#method_workerexecutor_submit_is_deprecated for more details.")
-        } else {
-            expectNoDeprecationWarnings(result)
-        }
+        expectDeprecationWarnings(result,
+            "The WorkerExecutor.submit() method has been deprecated. " +
+                "This is scheduled to be removed in Gradle 8.0. " +
+                "Please use the noIsolation(), classLoaderIsolation() or processIsolation() method instead. " +
+                "See https://docs.gradle.org/${GradleVersion.current().version}/userguide/upgrading_version_5.html#method_workerexecutor_submit_is_deprecated for more details.",
+            "The RepositoryHandler.jcenter() method has been deprecated. " +
+                "This is scheduled to be removed in Gradle 8.0. " +
+                "JCenter will soon be shut down. Use mavenCentral() instead. " +
+                "Consult the upgrading guide for further information: https://docs.gradle.org/${GradleVersion.current().version}/userguide/upgrading_version_6.html#jcenter_deprecation"
+        )
         assertConfigurationCacheStateStored()
 
         where:
         agpVersion << TESTED_AGP_VERSIONS
     }
 
-    @UnsupportedWithConfigurationCache(iterationMatchers = AGP_4_0_ITERATION_MATCHER)
-    def "incremental Java compilation works for Santa Tracker Java (agp=#agpVersion)"() {
+    @UnsupportedWithConfigurationCache(iterationMatchers = [AGP_4_0_ITERATION_MATCHER, AGP_4_1_ITERATION_MATCHER])
+    def "incremental Java compilation works for Santa Tracker (agp=#agpVersion)"() {
 
         given:
         AGP_VERSIONS.assumeCurrentJavaVersionIsSupportedBy(agpVersion)
 
         and:
         def checkoutDir = temporaryFolder.createDir("checkout")
-        setupCopyOfSantaTracker(checkoutDir, 'Java', agpVersion)
+        setupCopyOfSantaTracker(checkoutDir)
         def buildContext = new DefaultScenarioContext(UUID.randomUUID(), "nonAbiChange").withBuild(Phase.MEASURE, 0)
 
         and:
-        def pathToClass = "com/google/android/apps/santatracker/map/BottomSheetBehavior"
-        def fileToChange = checkoutDir.file("santa-tracker/src/main/java/${pathToClass}.java")
-        def compiledClassFile = checkoutDir.file("santa-tracker/build/intermediates/javac/developmentDebug/classes/${pathToClass}.class")
+        def pathToClass = "com/google/android/apps/santatracker/tracker/ui/BottomSheetBehavior"
+        def fileToChange = checkoutDir.file("tracker/src/main/java/${pathToClass}.java")
+        def compiledClassFile = checkoutDir.file("tracker/build/intermediates/javac/debug/classes/${pathToClass}.class")
         def nonAbiChangeMutator = new ApplyNonAbiChangeToJavaSourceFileMutator(fileToChange)
 
         when:
@@ -88,7 +84,7 @@ class AndroidSantaTrackerSmokeTest extends AbstractAndroidSantaTrackerSmokeTest 
         def md5Before = compiledClassFile.md5Hash
 
         then:
-        result.task(":santa-tracker:compileDevelopmentDebugJavaWithJavac").outcome == SUCCESS
+        result.task(":tracker:compileDebugJavaWithJavac").outcome == SUCCESS
         assertConfigurationCacheStateStored()
 
         when:
@@ -97,7 +93,7 @@ class AndroidSantaTrackerSmokeTest extends AbstractAndroidSantaTrackerSmokeTest 
         def md5After = compiledClassFile.md5Hash
 
         then:
-        result.task(":santa-tracker:compileDevelopmentDebugJavaWithJavac").outcome == SUCCESS
+        result.task(":tracker:compileDebugJavaWithJavac").outcome == SUCCESS
         assertConfigurationCacheStateLoaded()
         md5After != md5Before
 
@@ -106,14 +102,14 @@ class AndroidSantaTrackerSmokeTest extends AbstractAndroidSantaTrackerSmokeTest 
     }
 
     @UnsupportedWithConfigurationCache(iterationMatchers = [AGP_4_0_ITERATION_MATCHER, AGP_4_1_ITERATION_MATCHER, AGP_4_2_ITERATION_MATCHER])
-    def "can lint Santa-Tracker #flavour (agp=#agpVersion)"() {
+    def "can lint Santa-Tracker (agp=#agpVersion)"() {
 
         given:
         AGP_VERSIONS.assumeCurrentJavaVersionIsSupportedBy(agpVersion)
 
         and:
         def checkoutDir = temporaryFolder.createDir("checkout")
-        setupCopyOfSantaTracker(checkoutDir, flavour, agpVersion)
+        setupCopyOfSantaTracker(checkoutDir)
 
         when:
         def result = runnerForLocation(checkoutDir, agpVersion, "lintDebug").buildAndFail()
@@ -131,6 +127,6 @@ class AndroidSantaTrackerSmokeTest extends AbstractAndroidSantaTrackerSmokeTest 
         result.output.contains("Lint found errors in the project; aborting build.")
 
         where:
-        [agpVersion, flavour] << [TESTED_AGP_VERSIONS, ['Java', 'Kotlin']].combinations()
+        agpVersion << TESTED_AGP_VERSIONS
     }
 }

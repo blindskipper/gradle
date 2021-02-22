@@ -24,16 +24,16 @@ class IncrementalAndroidTestProject extends AndroidTestProject implements Increm
 
     private static final String ENABLE_AGP_IDE_MODE_ARG = "-Pandroid.injected.invoked.from.ide=true"
 
-    static final SANTA_TRACKER_KOTLIN = new IncrementalAndroidTestProject(
+    static final SANTA_TRACKER = new IncrementalAndroidTestProject(
         templateName: 'santaTrackerAndroidBuild',
         pathToChange: 'common/src/main/java/com/google/android/apps/santatracker/AudioPlayer.kt',
         taskToRunForChange: ':santa-tracker:assembleDebug'
     )
 
-    static final SANTA_TRACKER_JAVA = new IncrementalAndroidTestProject(
-        templateName: 'santaTrackerAndroidJavaBuild',
-        pathToChange: 'village/src/main/java/com/google/android/apps/santatracker/village/SnowFlake.java',
-        taskToRunForChange: ':santa-tracker:assembleDebug'
+    static final UBER_MOBILE_APP = new IncrementalAndroidTestProject(
+        templateName: 'uberMobileApp',
+        pathToChange: 'leafModuleAvg/src/main/java/leafModuleAvgpackageJava0/Foo0.java',
+        taskToRunForChange: ':rootModule:assembleDebug'
     )
 
     String pathToChange

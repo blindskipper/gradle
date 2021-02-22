@@ -45,6 +45,7 @@ class AndroidIncrementalExecutionPerformanceTest extends AbstractIncrementalExec
         runner.args.addAll(["--no-build-cache", "--no-scan"])
         runner.args.add("-D${StartParameterBuildOptions.ConfigurationCacheProblemsOption.PROPERTY_NAME}=warn")
         runner.args.add("-DkotlinVersion=${KOTLIN_TARGET_VERSION}")
+        runner.minimumBaseVersion = "6.5"
         applyEnterprisePlugin()
     }
 
@@ -61,7 +62,7 @@ class AndroidIncrementalExecutionPerformanceTest extends AbstractIncrementalExec
 
         where:
         configurationCachingEnabled << [true, false]
-        configurationCaching = configurationCachingEnabled ? " with configuration caching" : ""
+        configurationCaching = configurationCachingMessage(configurationCachingEnabled)
     }
 
     def "non-abi change#configurationCaching"() {
@@ -77,6 +78,23 @@ class AndroidIncrementalExecutionPerformanceTest extends AbstractIncrementalExec
 
         where:
         configurationCachingEnabled << [true, false]
-        configurationCaching = configurationCachingEnabled ? " with configuration caching" : ""
+        configurationCaching = configurationCachingMessage(configurationCachingEnabled)
+    }
+
+    @RunFor([])
+    def "up-to-date assembleDebug#configurationCaching"() {
+        given:
+        runner.tasksToRun = [testProject.taskToRunForChange]
+        enableConfigurationCaching(configurationCachingEnabled)
+
+        when:
+        def result = runner.run()
+
+        then:
+        result.assertCurrentVersionHasNotRegressed()
+
+        where:
+        configurationCachingEnabled << [true, false]
+        configurationCaching = configurationCachingMessage(configurationCachingEnabled)
     }
 }

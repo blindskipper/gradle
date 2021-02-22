@@ -16,17 +16,16 @@
 
 package promotion
 
-import common.Branch
+import common.VersionedSettingsBranch
 
-class PublishNightlySnapshotFromQuickFeedback(branch: Branch) : PublishGradleDistribution(
-    versionSettingsBranch = branch,
-    promotedBranch = branch.name.toLowerCase(),
+class PublishNightlySnapshotFromQuickFeedback(branch: VersionedSettingsBranch) : PublishGradleDistribution(
+    promotedBranch = branch.branchName,
     task = branch.promoteNightlyTaskName(),
     triggerName = "QuickFeedback"
 ) {
     init {
-        id("Promotion_${branch.name}SnapshotFromQuickFeedback")
+        id("Promotion_SnapshotFromQuickFeedback")
         name = "Nightly Snapshot (from QuickFeedback)"
-        description = "Promotes the latest successful changes on '${branch.name.toLowerCase()}' from Quick Feedback as a new nightly snapshot"
+        description = "Promotes the latest successful changes on '${branch.branchName}' from Quick Feedback as a new nightly snapshot"
     }
 }

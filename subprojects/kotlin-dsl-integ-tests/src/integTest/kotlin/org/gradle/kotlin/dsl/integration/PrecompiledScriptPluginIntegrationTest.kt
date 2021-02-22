@@ -3,7 +3,7 @@ package org.gradle.kotlin.dsl.integration
 import org.codehaus.groovy.runtime.StringGroovyMethods
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.integtests.fixtures.RepoScriptBlockUtil.jcenterRepository
+import org.gradle.integtests.fixtures.RepoScriptBlockUtil
 import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.kotlin.dsl.fixtures.normalisedPath
 import org.gradle.test.fixtures.dsl.GradleDsl
@@ -59,19 +59,6 @@ class PrecompiledScriptPluginIntegrationTest : AbstractPluginIntegrationTest() {
 
         build("generateScriptPluginAdapters")
 
-        // https://github.com/JLLeitschuh/ktlint-gradle/issues/395
-        fun expectKtlintDeprecationWarning(sourceSet: String) {
-            val taskFragment = sourceSet.capitalize()
-            executer.expectDocumentedDeprecationWarning(
-                "Querying the mapped value of task ':ktlint${taskFragment}SourceSetCheck' property 'reporterOutputDir' before task ':ktlint${taskFragment}SourceSetCheck' has completed has been deprecated. " +
-                    "This will fail with an error in Gradle 7.0. " +
-                    "Consult the upgrading guide for further information: https://docs.gradle.org/current/userguide/upgrading_version_6.html#querying_a_mapped_output_property_of_a_task_before_the_task_has_completed"
-            )
-        }
-
-        expectKtlintDeprecationWarning("main")
-        expectKtlintDeprecationWarning("test")
-
         build("ktlintCheck", "-x", "ktlintKotlinScriptCheck")
     }
 
@@ -97,7 +84,7 @@ class PrecompiledScriptPluginIntegrationTest : AbstractPluginIntegrationTest() {
             firstLocation,
             """
             plugins { `kotlin-dsl` }
-            ${jcenterRepository(GradleDsl.KOTLIN)}
+            ${RepoScriptBlockUtil.mavenCentralRepository(GradleDsl.KOTLIN)}
             """
         )
 
@@ -149,7 +136,6 @@ class PrecompiledScriptPluginIntegrationTest : AbstractPluginIntegrationTest() {
         withBuildScript(
             """
             plugins { `kotlin-dsl` }
-            ${jcenterRepository(GradleDsl.KOTLIN)}
             """
         )
 

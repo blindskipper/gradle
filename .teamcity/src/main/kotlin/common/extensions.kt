@@ -23,9 +23,11 @@ import jetbrains.buildServer.configs.kotlin.v2019_2.AbsoluteId
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildStep
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildSteps
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildType
+import jetbrains.buildServer.configs.kotlin.v2019_2.BuildTypeSettings
 import jetbrains.buildServer.configs.kotlin.v2019_2.CheckoutMode
 import jetbrains.buildServer.configs.kotlin.v2019_2.Dependencies
 import jetbrains.buildServer.configs.kotlin.v2019_2.FailureAction
+import jetbrains.buildServer.configs.kotlin.v2019_2.RelativeId
 import jetbrains.buildServer.configs.kotlin.v2019_2.Requirements
 import jetbrains.buildServer.configs.kotlin.v2019_2.VcsSettings
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.GradleBuildStep
@@ -91,7 +93,9 @@ fun BuildType.applyDefaultSettings(os: Os = Os.LINUX, timeout: Int = 30, vcsRoot
     }
 
     failureConditions {
-        executionTimeoutMin = timeout
+        if (this@applyDefaultSettings.type != BuildTypeSettings.Type.COMPOSITE) {
+            executionTimeoutMin = timeout
+        }
         testFailure = false
         add {
             failOnText {
@@ -131,16 +135,16 @@ fun buildToolGradleParameters(daemon: Boolean = true, isContinue: Boolean = true
         if (isContinue) "--continue" else ""
     )
 
-fun Dependencies.compileAllDependency(compileAllId: String = "Gradle_Check_CompileAll") {
+fun Dependencies.compileAllDependency(compileAllId: String) {
     // Compile All has to succeed before anything else is started
-    dependency(AbsoluteId(compileAllId)) {
+    dependency(RelativeId(compileAllId)) {
         snapshot {
             onDependencyFailure = FailureAction.CANCEL
             onDependencyCancel = FailureAction.CANCEL
         }
     }
     // Get the build receipt from sanity check to reuse the timestamp
-    artifacts(AbsoluteId(compileAllId)) {
+    artifacts(RelativeId(compileAllId)) {
         id = "ARTIFACT_DEPENDENCY_$compileAllId"
         cleanDestination = true
         artifactRules = "build-receipt.properties => incoming-distributions"

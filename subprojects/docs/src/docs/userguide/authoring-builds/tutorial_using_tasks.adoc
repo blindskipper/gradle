@@ -39,7 +39,7 @@ A task represents some atomic piece of work which a build performs.
 This might be compiling some classes, creating a JAR, generating Javadoc, or publishing some archives to a repository.
 
 Typically, tasks are provided by <<plugins.adoc#sec:plugins_block,applying a plugin>> so that you do not have to define them yourself.
-Still, to give you an idea of what a taks is, we will look at defining some simple tasks in a build with one project in this chapter.
+Still, to give you an idea of what a task is, we will look at defining some simple tasks in a build with one project in this chapter.
 
 [[sec:hello_world]]
 == Hello world
@@ -265,8 +265,8 @@ This is equivalent to running `gradle clean run`. In a multi-project build every
 [[sec:build_script_external_dependencies]]
 == External dependencies for the build script
 
-NOTE: Instead of manipulating the script classpath directly, it is recommended to <<plugins.adoc#,apply plugins>> that come with their own classpath.
-For custom build logic, the recommendation is to <<sharing_build_logic_between_subprojects.adoc#,use a custom plugin>>.
+NOTE: Instead of manipulating the script classpath directly, it is recommended to <<plugins.adoc#plugins,apply plugins>> that come with their own classpath.
+For custom build logic, the recommendation is to <<sharing_build_logic_between_subprojects.adoc#sharing_build_logic_between_subprojects,use a custom plugin>>.
 
 If your build script needs to use external libraries, you can add them to the script's classpath in the build script itself. You do this using the `buildscript()` method, passing in a block which declares the build script classpath.
 

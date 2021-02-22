@@ -26,20 +26,21 @@ dependencies {
     implementation(libs.groovy)
     implementation(libs.asm)
     implementation(libs.asmCommons)
-    implementation(libs.asmUtil)
     implementation(libs.guava)
     implementation(libs.commonsLang)
     implementation(libs.commonsIo)
-    implementation(libs.commonsHttpclient)
+    implementation(libs.httpcore)
     implementation(libs.inject)
     implementation(libs.gson)
     implementation(libs.ant)
     implementation(libs.ivy)
-    implementation(libs.maven3)
+    implementation(libs.maven3SettingsBuilder)
 
     testImplementation(project(":process-services"))
     testImplementation(project(":diagnostics"))
     testImplementation(project(":build-cache-packaging"))
+    testImplementation(libs.asmUtil)
+    testImplementation(libs.commonsHttpclient)
     testImplementation(libs.nekohtml)
     testImplementation(testFixtures(project(":core")))
     testImplementation(testFixtures(project(":messaging")))
@@ -109,15 +110,3 @@ tasks.clean {
         }.visit { this.file.setWritable(true) }
     }
 }
-
-// This is a workaround for the validate plugins task trying to inspect classes which
-// have changed but are NOT tasks
-tasks.withType<ValidatePlugins>().configureEach {
-    val main = sourceSets.main.get()
-    classes.setFrom(main.output.classesDirs.asFileTree.filter { !it.isInternal(main) })
-}
-
-fun File.isInternal(sourceSet: SourceSet) = isInternal(sourceSet.output.classesDirs.files)
-
-fun File.isInternal(roots: Set<File>): Boolean = name == "internal" ||
-    !roots.contains(parentFile) && parentFile.isInternal(roots)
